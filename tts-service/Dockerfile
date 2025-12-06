@@ -1,8 +1,11 @@
-FROM nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu22.04
+# Use build argument to choose base image (CPU vs GPU)
+ARG BASE_IMAGE=nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu22.04
+FROM ${BASE_IMAGE}
 
-# Install Python and dependencies
+# Install system dependencies
+# Note: python3/pip may already be installed on python:* base images
 RUN apt-get update && apt-get install -y \
-    python3.10 \
+    python3 \
     python3-pip \
     git \
     libsndfile1 \
@@ -13,11 +16,11 @@ RUN apt-get update && apt-get install -y \
 # Set working directory
 WORKDIR /app
 
-# Copy requirements and install
+# Copy requirements and install (leverage layer caching)
 COPY requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
-# Copy application
+# Copy application (separate layer for better caching)
 COPY app.py .
 
 # Expose port

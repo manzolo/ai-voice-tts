@@ -138,13 +138,19 @@ TTS_VOCODER=vocoder_models/en/ljspeech/hifigan_v2
 
 The project includes automated testing via GitHub Actions that:
 
-1. **Builds Docker images** without errors
+1. **Builds Docker images** without errors (using lightweight Python base image)
 2. **Starts the service** with a small model (glow-tts ~100MB)
 3. **Verifies health endpoint** returns healthy status
 4. **Tests TTS API** by generating a test audio file
 5. **Validates output** ensures generated WAV file is valid
 
-The CI workflow uses a smaller model to stay within GitHub Actions resource limits while still testing the full functionality. See `.github/workflows/ci.yml` for details.
+**CI Optimizations:**
+- Uses `python:3.10-slim` base image instead of CUDA (~150MB vs ~5GB)
+- Downloads smaller TTS model (glow-tts ~100MB vs XTTS v2 ~2GB)
+- Docker layer caching for faster subsequent builds
+- 15-minute timeout for build step
+
+The CI workflow stays within GitHub Actions resource limits while still testing the full functionality. See `.github/workflows/ci.yml` for details.
 
 **Running tests locally:**
 ```bash
