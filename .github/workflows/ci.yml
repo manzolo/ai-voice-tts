@@ -46,11 +46,8 @@ jobs:
 
       - name: Build Docker images (CPU-only for faster CI)
         run: |
-          # Use lightweight Python base image and CPU-only PyTorch for faster CI builds
-          docker compose build \
-            --build-arg BASE_IMAGE=python:3.10-slim-bullseye \
-            --build-arg REQUIREMENTS_FILE=requirements-cpu.txt \
-            --build-arg BUILDKIT_INLINE_CACHE=1
+          # Build CPU variant - Dockerfile defaults are already configured for CPU
+          docker compose build tts
         timeout-minutes: 15
         env:
           DOCKER_BUILDKIT: 1
