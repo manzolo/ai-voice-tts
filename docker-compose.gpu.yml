@@ -1,6 +1,10 @@
 services:
   tts:
-    build: ./tts-service
+    build:
+      context: ./tts-service
+      args:
+        BASE_IMAGE: nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu22.04
+        REQUIREMENTS_FILE: requirements.txt
     container_name: ai-voice-tts
     ports:
       - "${TTS_PORT:-9876}:5002"
