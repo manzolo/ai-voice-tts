@@ -1,0 +1,155 @@
+name: CI - Test TTS Service
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+  workflow_dispatch:
+
+jobs:
+  test-tts-service:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Create .env file for testing
+        run: |
+          cat > .env << EOF
+          DEFAULT_LANGUAGE=en
+          DEFAULT_SPEAKER=female
+          CORS_ALLOW_ORIGINS=*
+          CORS_ALLOW_CREDENTIALS=false
+          CORS_ALLOW_METHODS=*
+          CORS_ALLOW_HEADERS=*
+          # Use small model for CI testing
+          TTS_MODEL=tts_models/en/ljspeech/glow-tts
+          TTS_VOCODER=vocoder_models/en/ljspeech/hifigan_v2
+          EOF
+
+      - name: Create models directory
+        run: mkdir -p models
+
+      - name: Build Docker images
+        run: docker compose build
+        timeout-minutes: 5
+
+      - name: Start services
+        run: docker compose up -d
+
+      - name: Wait for services to initialize
+        run: |
+          echo "Waiting for TTS service to be ready..."
+          max_attempts=60
+          attempt=0
+
+          while [ $attempt -lt $max_attempts ]; do
+            if curl -f -s http://localhost:9876/health > /dev/null 2>&1; then
+              echo "✅ Service is ready!"
+              break
+            fi
+
+            attempt=$((attempt + 1))
+            echo "⏳ Waiting for service... (attempt $attempt/$max_attempts)"
+            sleep 5
+          done
+
+          if [ $attempt -eq $max_attempts ]; then
+            echo "❌ Service failed to start within timeout"
+            docker compose logs
+            exit 1
+          fi
+
+      - name: Check health endpoint
+        run: |
+          echo "Testing /health endpoint..."
+          response=$(curl -s http://localhost:9876/health)
+          echo "Response: $response"
+
+          # Check if response contains "healthy" status
+          if echo "$response" | grep -q '"status":"healthy"'; then
+            echo "✅ Health check passed"
+          else
+            echo "❌ Health check failed"
+            echo "Full response: $response"
+            exit 1
+          fi
+
+      - name: Test TTS API endpoint
+        run: |
+          echo "Testing TTS API with sample text..."
+
+          # Make TTS request
+          http_code=$(curl -s -o /tmp/test_output.wav -w "%{http_code}" \
+            -X POST http://localhost:9876/api/tts \
+            -H "Content-Type: application/json" \
+            -d '{"text": "Hello, this is a test.", "language": "en", "speaker": "female"}')
+
+          echo "HTTP Status: $http_code"
+
+          if [ "$http_code" = "200" ]; then
+            echo "✅ TTS API request successful"
+
+            # Check if output file exists and is not empty
+            if [ -f /tmp/test_output.wav ] && [ -s /tmp/test_output.wav ]; then
+              file_size=$(stat -f%z /tmp/test_output.wav 2>/dev/null || stat -c%s /tmp/test_output.wav)
+              echo "✅ Audio file generated (size: $file_size bytes)"
+
+              # Verify it's a valid WAV file
+              if file /tmp/test_output.wav | grep -q "WAVE"; then
+                echo "✅ Valid WAV file confirmed"
+              else
+                echo "❌ Generated file is not a valid WAV"
+                file /tmp/test_output.wav
+                exit 1
+              fi
+            else
+              echo "❌ Audio file not generated or empty"
+              exit 1
+            fi
+          else
+            echo "❌ TTS API request failed with status $http_code"
+            cat /tmp/test_output.wav 2>/dev/null || echo "No response body"
+            exit 1
+          fi
+
+      - name: Test root endpoint
+        run: |
+          echo "Testing root endpoint..."
+          response=$(curl -s http://localhost:9876/)
+          echo "Response: $response"
+
+          if echo "$response" | grep -q '"status":"running"'; then
+            echo "✅ Root endpoint working"
+          else
+            echo "❌ Root endpoint failed"
+            exit 1
+          fi
+
+      - name: Show service logs on failure
+        if: failure()
+        run: |
+          echo "=== Docker Compose Logs ==="
+          docker compose logs
+          echo ""
+          echo "=== Container Status ==="
+          docker compose ps
+
+      - name: Stop services
+        if: always()
+        run: docker compose down -v
+
+      - name: Check for model download size
+        if: always()
+        run: |
+          echo "=== Model Storage ==="
+          du -sh models 2>/dev/null || echo "No models directory"
+          if [ -d models ]; then
+            du -h models
+          fi

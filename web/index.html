@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TTS - Text to Speech</title>
+    <script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js"></script>
+    <style>
+        body {
+            font-family: system-ui;
+            background: #0d1117;
+            color: #c9d1d9;
+            padding: 2rem;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #58a6ff;
+        }
+
+        .card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+        }
+
+        textarea,
+        select,
+        button {
+            width: 100%;
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 8px;
+            border: 1px solid #30363d;
+            background: #0d1117;
+            color: #c9d1d9;
+            font-size: 1rem;
+        }
+
+        button {
+            background: #238636;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+
+        button:hover:not(:disabled) {
+            background: #2ea043;
+        }
+
+        button:disabled {
+            background: #30363d;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .progress-container {
+            width: 100%;
+            background: #21262d;
+            border-radius: 8px;
+            height: 8px;
+            margin: 1rem 0;
+            overflow: hidden;
+            display: none;
+        }
+
+        .progress-container.active {
+            display: block;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #238636, #2ea043);
+            width: 0%;
+            transition: width 0.3s ease;
+            border-radius: 8px;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.7;
+            }
+        }
+
+        .progress-text {
+            font-size: 0.9rem;
+            color: #8b949e;
+            margin-top: 0.5rem;
+            display: none;
+        }
+
+        .progress-text.active {
+            display: block;
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 0.5rem;
+        }
+
+        .status-ready {
+            background: #3fb950;
+            box-shadow: 0 0 8px #3fb950;
+        }
+
+        .status-processing {
+            background: #f0883e;
+            box-shadow: 0 0 8px #f0883e;
+            animation: blink 1s infinite;
+        }
+
+        .status-checking {
+            background: #8b949e;
+            box-shadow: 0 0 8px #8b949e;
+            animation: rotate 2s linear infinite;
+        }
+
+        .status-offline {
+            background: #da3633;
+            box-shadow: 0 0 8px #da3633;
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.3;
+            }
+        }
+
+        @keyframes rotate {
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .result {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: #21262d;
+            border-radius: 8px;
+        }
+
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            margin: 0;
+            font-family: inherit;
+        }
+    </style>
+</head>
+
+<body>
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h1 data-i18n="title">Text to Speech (TTS)</h1>
+        <select id="interfaceLanguage" onchange="changeLanguage(this.value)" style="width: auto;">
+            <option value="en">🇬🇧 English</option>
+            <option value="it">🇮🇹 Italiano</option>
+            <option value="es">🇪🇸 Español</option>
+            <option value="fr">🇫🇷 Français</option>
+            <option value="de">🇩🇪 Deutsch</option>
+            <option value="pt">🇵🇹 Português</option>
+            <option value="pl">🇵🇱 Polski</option>
+            <option value="tr">🇹🇷 Türkçe</option>
+            <option value="ru">🇷🇺 Русский</option>
+            <option value="nl">🇳🇱 Nederlands</option>
+            <option value="cs">🇨🇿 Čeština</option>
+            <option value="ar">🇸🇦 العربية</option>
+            <option value="zh-cn">🇨🇳 中文</option>
+            <option value="ja">🇯🇵 日本語</option>
+            <option value="hu">🇭🇺 Magyar</option>
+            <option value="ko">🇰🇷 한국어</option>
+        </select>
+    </div>
+
+    <div class="card">
+        <h2>
+            <span class="status-indicator status-offline" id="ttsStatus"></span>
+            <span data-i18n="ttsTitle">Text → Audio (XTTS-v2)</span>
+        </h2>
+        <textarea id="text" rows="6" placeholder="Write here the text to convert to speech..."></textarea>
+        <select id="speaker">
+            <option value="male" data-i18n="voiceMale">Male Voice</option>
+            <option value="female" data-i18n="voiceFemale">Female Voice</option>
+        </select>
+
+        <div class="progress-container" id="ttsProgress">
+            <div class="progress-bar" id="ttsProgressBar"></div>
+        </div>
+        <div class="progress-text" id="ttsProgressText"></div>
+
+        <button onclick="tts()" id="ttsButton" data-i18n="btnConvert">Convert to Audio</button>
+        <div id="ttsResult" class="result"></div>
+    </div>
+
+    <script>
+        const translations = {
+            en: {
+                title: "Text to Speech (TTS)",
+                ttsTitle: "Text → Audio (XTTS-v2)",
+                placeholder: "Write here the text to convert to speech...",
+                defaultText: "Hello! This is a text-to-speech test with XTTS v2. The quality is incredible!",
+                voiceMale: "Male Voice",
+                voiceFemale: "Female Voice",
+                btnConvert: "Convert to Audio",
+                btnWaiting: "Waiting for service...",
+                genProgress: "Generating... (first run downloads model ~2GB)",
+                downloadWav: "📥 Download WAV",
+                downloadMp3: "📥 Download MP3",
+                connError: "Connection error: Ensure XTTS server is up (docker logs xtts)"
+            },
+            it: {
+                title: "Sintesi Vocale (TTS)",
+                ttsTitle: "Testo → Audio (XTTS-v2)",
+                placeholder: "Scrivi qui il testo da convertire in voce...",
+                defaultText: "Ciao! Questo è un test di sintesi vocale con XTTS v2. La qualità è incredibile!",
+                voiceMale: "Voce Maschile",
+                voiceFemale: "Voce Femminile",
+                btnConvert: "Converti in audio",
+                btnWaiting: "In attesa del servizio...",
+                genProgress: "Generazione in corso... (primo avvio scarica modello ~2GB)",
+                downloadWav: "📥 Scarica WAV",
+                downloadMp3: "📥 Scarica MP3",
+                connError: "Errore connessione: Assicurati che il server XTTS sia up (docker logs xtts)"
+            },
+            es: {
+                title: "Síntesis de Voz (TTS)",
+                ttsTitle: "Texto → Audio (XTTS-v2)",
+                placeholder: "Escribe aquí el texto para convertir a voz...",
+                defaultText: "¡Hola! Esta es una prueba de síntesis de voz con XTTS v2. ¡La calidad es increíble!",
+                voiceMale: "Voz Masculina",
+                voiceFemale: "Voz Femenina",
+                btnConvert: "Convertir a Audio",
+                btnWaiting: "Esperando servicio...",
+                genProgress: "Generando... (primera ejecución descarga modelo ~2GB)",
+                downloadWav: "📥 Descargar WAV",
+                downloadMp3: "📥 Descargar MP3",
+                connError: "Error de conexión: Asegúrate de que el servidor XTTS esté activo (docker logs xtts)"
+            },
+            fr: {
+                title: "Synthèse Vocale (TTS)",
+                ttsTitle: "Texte → Audio (XTTS-v2)",
+                placeholder: "Écrivez ici le texte à convertir en voix...",
+                defaultText: "Bonjour! Ceci est un test de synthèse vocale avec XTTS v2. La qualité est incroyable!",
+                voiceMale: "Voix Masculine",
+                voiceFemale: "Voix Féminine",
+                btnConvert: "Convertir en Audio",
+                btnWaiting: "En attente du service...",
+                genProgress: "Génération... (premier lancement télécharge le modèle ~2GB)",
+                downloadWav: "📥 Télécharger WAV",
+                downloadMp3: "📥 Télécharger MP3",
+                connError: "Erreur de connexion: Assurez-vous que le serveur XTTS est actif (docker logs xtts)"
+            },
+            de: {
+                title: "Sprachsynthese (TTS)",
+                ttsTitle: "Text → Audio (XTTS-v2)",
+                placeholder: "Geben Sie hier den Text ein, der in Sprache umgewandelt werden soll...",
+                defaultText: "Hallo! Dies ist ein Sprachsynthese-Test mit XTTS v2. Die Qualität ist unglaublich!",
+                voiceMale: "Männliche Stimme",
+                voiceFemale: "Weibliche Stimme",
+                btnConvert: "In Audio konvertieren",
+                btnWaiting: "Warte auf Service...",
+                genProgress: "Generierung... (erster Lauf lädt Modell ~2GB herunter)",
+                downloadWav: "📥 WAV herunterladen",
+                downloadMp3: "📥 MP3 herunterladen",
+                connError: "Verbindungsfehler: Stellen Sie sicher, dass der XTTS-Server läuft (docker logs xtts)"
+            },
+            pt: {
+                title: "Síntese de Voz (TTS)",
+                ttsTitle: "Texto → Áudio (XTTS-v2)",
+                placeholder: "Escreva aqui o texto para converter em voz...",
+                defaultText: "Olá! Este é um teste de síntese de voz com XTTS v2. A qualidade é incrível!",
+                voiceMale: "Voz Masculina",
+                voiceFemale: "Voz Feminina",
+                btnConvert: "Converter para Áudio",
+                btnWaiting: "Aguardando serviço...",
+                genProgress: "Gerando... (primeira execução baixa modelo ~2GB)",
+                downloadWav: "📥 Baixar WAV",
+                downloadMp3: "📥 Baixar MP3",
+                connError: "Erro de conexão: Certifique-se de que o servidor XTTS está ativo (docker logs xtts)"
+            },
+            pl: {
+                title: "Synteza Mowy (TTS)",
+                ttsTitle: "Tekst → Audio (XTTS-v2)",
+                placeholder: "Wpisz tutaj tekst do konwersji na mowę...",
+                defaultText: "Cześć! To jest test syntezy mowy z XTTS v2. Jakość jest niesamowita!",
+                voiceMale: "Głos Męski",
+                voiceFemale: "Głos Żeński",
+                btnConvert: "Konwertuj na Audio",
+                btnWaiting: "Oczekiwanie na usługę...",
+                genProgress: "Generowanie... (pierwsze uruchomienie pobiera model ~2GB)",
+                downloadWav: "📥 Pobierz WAV",
+                downloadMp3: "📥 Pobierz MP3",
+                connError: "Błąd połączenia: Upewnij się, że serwer XTTS działa (docker logs xtts)"
+            },
+            tr: {
+                title: "Konuşma Sentezi (TTS)",
+                ttsTitle: "Metin → Ses (XTTS-v2)",
+                placeholder: "Sese dönüştürülecek metni buraya yazın...",
+                defaultText: "Merhaba! Bu, XTTS v2 ile bir konuşma sentezi testidir. Kalite inanılmaz!",
+                voiceMale: "Erkek Ses",
+                voiceFemale: "Kadın Ses",
+                btnConvert: "Sese Dönüştür",
+                btnWaiting: "Hizmet bekleniyor...",
+                genProgress: "Oluşturuluyor... (ilk çalıştırma model indirir ~2GB)",
+                downloadWav: "📥 WAV İndir",
+                downloadMp3: "📥 MP3 İndir",
+                connError: "Bağlantı hatası: XTTS sunucusunun çalıştığından emin olun (docker logs xtts)"
+            },
+            ru: {
+                title: "Синтез Речи (TTS)",
+                ttsTitle: "Текст → Аудио (XTTS-v2)",
+                placeholder: "Введите текст для преобразования в речь...",
+                defaultText: "Привет! Это тест синтеза речи с XTTS v2. Качество невероятное!",
+                voiceMale: "Мужской голос",
+                voiceFemale: "Женский голос",
+                btnConvert: "Преобразовать в аудио",
+                btnWaiting: "Ожидание сервиса...",
+                genProgress: "Генерация... (первый запуск загружает модель ~2ГБ)",
+                downloadWav: "📥 Скачать WAV",
+                downloadMp3: "📥 Скачать MP3",
+                connError: "Ошибка подключения: Убедитесь, что сервер XTTS запущен (docker logs xtts)"
+            },
+            nl: {
+                title: "Spraaksynthese (TTS)",
+                ttsTitle: "Tekst → Audio (XTTS-v2)",
+                placeholder: "Schrijf hier de tekst om te converteren naar spraak...",
+                defaultText: "Hallo! Dit is een spraaksynthese test met XTTS v2. De kwaliteit is ongelooflijk!",
+                voiceMale: "Mannelijke Stem",
+                voiceFemale: "Vrouwelijke Stem",
+                btnConvert: "Converteer naar Audio",
+                btnWaiting: "Wachten op service...",
+                genProgress: "Genereren... (eerste run downloadt model ~2GB)",
+                downloadWav: "📥 Download WAV",
+                downloadMp3: "📥 Download MP3",
+                connError: "Verbindingsfout: Zorg ervoor dat de XTTS-server actief is (docker logs xtts)"
+            },
+            cs: {
+                title: "Syntéza Řeči (TTS)",
+                ttsTitle: "Text → Audio (XTTS-v2)",
+                placeholder: "Zde napište text pro převod na řeč...",
+                defaultText: "Ahoj! Toto je test syntézy řeči s XTTS v2. Kvalita je neuvěřitelná!",
+                voiceMale: "Mužský hlas",
+                voiceFemale: "Ženský hlas",
+                btnConvert: "Převést na audio",
+                btnWaiting: "Čekání na službu...",
+                genProgress: "Generování... (první spuštění stáhne model ~2GB)",
+                downloadWav: "📥 Stáhnout WAV",
+                downloadMp3: "📥 Stáhnout MP3",
+                connError: "Chyba připojení: Ujistěte se, že server XTTS běží (docker logs xtts)"
+            },
+            ar: {
+                title: "تحويل النص إلى كلام (TTS)",
+                ttsTitle: "نص ← صوت (XTTS-v2)",
+                placeholder: "اكتب هنا النص لتحويله إلى كلام...",
+                defaultText: "مرحبا! هذا اختبار لتوليد الكلام مع XTTS v2. الجودة لا تصدق!",
+                voiceMale: "صوت ذكوري",
+                voiceFemale: "صوت أنثوي",
+                btnConvert: "تحويل إلى صوت",
+                btnWaiting: "في انتظار الخدمة...",
+                genProgress: "جاري التوليد... (التشغيل الأول يقوم بتنزيل النموذج ~2 جيجابايت)",
+                downloadWav: "📥 تنزيل WAV",
+                downloadMp3: "📥 تنزيل MP3",
+                connError: "خطأ في الاتصال: تأكد من تشغيل XTTS (docker logs xtts)"
+            },
+            "zh-cn": {
+                title: "文本转语音 (TTS)",
+                ttsTitle: "文本 → 音频 (XTTS-v2)",
+                placeholder: "在此输入要转换为语音的文本...",
+                defaultText: "你好！这是使用 XTTS v2 的语音合成测试。质量令人难以置信！",
+                voiceMale: "男声",
+                voiceFemale: "女声",
+                btnConvert: "转换为音频",
+                btnWaiting: "等待服务...",
+                genProgress: "生成中...（首次运行下载模型 ~2GB）",
+                downloadWav: "📥 下载 WAV",
+                downloadMp3: "📥 下载 MP3",
+                connError: "连接错误：确保 XTTS 服务器正在运行 (docker logs xtts)"
+            },
+            ja: {
+                title: "テキスト読み上げ (TTS)",
+                ttsTitle: "テキスト → 音声 (XTTS-v2)",
+                placeholder: "音声に変換するテキストをここに入力...",
+                defaultText: "こんにちは！これはXTTS v2による音声合成テストです。品質は素晴らしいです！",
+                voiceMale: "男性の声",
+                voiceFemale: "女性の声",
+                btnConvert: "音声に変換",
+                btnWaiting: "サービス待機中...",
+                genProgress: "生成中...（初回実行時はモデルをダウンロード ~2GB）",
+                downloadWav: "📥 WAVをダウンロード",
+                downloadMp3: "📥 MP3をダウンロード",
+                connError: "接続エラー：XTTSサーバーが起動していることを確認してください (docker logs xtts)"
+            },
+            hu: {
+                title: "Szövegfelolvasás (TTS)",
+                ttsTitle: "Szöveg → Hang (XTTS-v2)",
+                placeholder: "Írja be ide a beszéddé alakítandó szöveget...",
+                defaultText: "Helló! Ez egy beszédszintézis teszt az XTTS v2-vel. A minőség hihetetlen!",
+                voiceMale: "Férfi hang",
+                voiceFemale: "Női hang",
+                btnConvert: "Átalakítás hanggá",
+                btnWaiting: "Várakozás a szolgáltatásra...",
+                genProgress: "Generálás... (első futtatás letölti a modellt ~2GB)",
+                downloadWav: "📥 WAV letöltése",
+                downloadMp3: "📥 MP3 letöltése",
+                connError: "Kapcsolati hiba: Győződjön meg róla, hogy az XTTS szerver fut (docker logs xtts)"
+            },
+            ko: {
+                title: "텍스트 음성 변환 (TTS)",
+                ttsTitle: "텍스트 → 오디오 (XTTS-v2)",
+                placeholder: "음성으로 변환할 텍스트를 여기에 입력하세요...",
+                defaultText: "안녕하세요! XTTS v2를 사용한 음성 합성 테스트입니다. 품질이 놀랍습니다!",
+                voiceMale: "남성 목소리",
+                voiceFemale: "여성 목소리",
+                btnConvert: "오디오로 변환",
+                btnWaiting: "서비스 대기 중...",
+                genProgress: "생성 중... (첫 실행 시 모델 다운로드 ~2GB)",
+                downloadWav: "📥 WAV 다운로드",
+                downloadMp3: "📥 MP3 다운로드",
+                connError: "연결 오류: XTTS 서버가 실행 중인지 확인하세요 (docker logs xtts)"
+            }
+        };
+
+        let currentLang = 'en';
+
+        function changeLanguage(lang) {
+            currentLang = lang;
+            const t = translations[lang] || translations['en'];
+
+            // Save language preference to localStorage
+            localStorage.setItem('preferredLanguage', lang);
+
+            // Update the dropdown to match
+            const languageSelect = document.getElementById('interfaceLanguage');
+            if (languageSelect) {
+                languageSelect.value = lang;
+            }
+
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (t[key]) el.textContent = t[key];
+            });
+
+            document.getElementById('text').placeholder = t.placeholder;
+
+            const textArea = document.getElementById('text');
+            const isDefaultText = Object.values(translations).some(trans => textArea.value === trans.defaultText);
+            if (isDefaultText || textArea.value === "") {
+                textArea.value = t.defaultText;
+            }
+        }
+
+        // Load saved language preference or default to English
+        const savedLang = localStorage.getItem('preferredLanguage') || 'en';
+        changeLanguage(savedLang);
+
+        const getTTSUrl = () => {
+            const hostname = window.location.hostname;
+            return `http://${hostname}:9876/api/tts`;
+        };
+
+        function updateProgress(percent, text) {
+            const progressBar = document.getElementById('ttsProgressBar');
+            const progressText = document.getElementById('ttsProgressText');
+            const progressContainer = document.getElementById('ttsProgress');
+
+            if (percent > 0) {
+                progressContainer.classList.add('active');
+                progressText.classList.add('active');
+                progressBar.style.width = percent + '%';
+                progressText.textContent = text;
+            } else {
+                progressContainer.classList.remove('active');
+                progressText.classList.remove('active');
+            }
+        }
+
+        function setStatus(processing) {
+            const t = translations[currentLang];
+            const status = document.getElementById('ttsStatus');
+            const button = document.getElementById('ttsButton');
+
+            if (processing === 'offline') {
+                status.className = 'status-indicator status-offline';
+                button.disabled = true;
+                if (!button.dataset.originalText) {
+                    button.dataset.originalText = button.textContent;
+                }
+                button.textContent = t.btnWaiting;
+            } else if (processing === 'checking') {
+                status.className = 'status-indicator status-checking';
+                button.disabled = true;
+                if (!button.dataset.originalText) {
+                    button.dataset.originalText = button.textContent;
+                }
+                button.textContent = t.btnWaiting;
+            } else if (processing) {
+                status.className = 'status-indicator status-processing';
+                button.disabled = true;
+                if (button.dataset.originalText) {
+                    button.textContent = button.dataset.originalText;
+                }
+            } else {
+                status.className = 'status-indicator status-ready';
+                button.disabled = false;
+                if (button.dataset.originalText) {
+                    button.textContent = button.dataset.originalText;
+                }
+            }
+        }
+
+        async function checkServiceHealth() {
+            setStatus('checking');
+            updateProgress(0, 'Checking service status...');
+
+            // Increased retries for initial model download (~2GB can take 5-10 minutes)
+            const maxRetries = 120; // Try for up to 120 times = 10 minutes
+            const retryDelay = 5000; // 5 seconds between retries
+
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    // Check the /health endpoint to verify model is loaded
+                    const resp = await fetch(getTTSUrl().replace('/api/tts', '/health'), {
+                        method: 'GET',
+                        mode: 'cors',
+                        signal: AbortSignal.timeout(3000)
+                    });
+
+                    if (resp.ok) {
+                        // Verify the response indicates the model is loaded
+                        const data = await resp.json();
+                        if (data.status === 'healthy' && data.model_loaded) {
+                            console.log('[TTS] Service is healthy and ready');
+                            updateProgress(0, ''); // Clear progress
+                            setStatus(false); // Service is ready - turn green
+                            return true;
+                        } else {
+                            console.debug(`[TTS] Service responded but not fully ready: ${JSON.stringify(data)}`);
+                        }
+                    } else if (resp.status === 503) {
+                        // Service unavailable - model downloading/loading
+                        try {
+                            const errorData = await resp.json();
+                            const progress = errorData.detail?.progress || 0;
+                            const message = errorData.detail?.message || 'Loading model...';
+                            console.log(`[TTS] ${message} (${progress}%) - attempt ${i + 1}/${maxRetries}`);
+                            updateProgress(progress, message);
+                            setStatus('checking');
+                        } catch (e) {
+                            // Couldn't parse error details, use generic message
+                            console.debug(`[TTS] Service initializing... (${i + 1}/${maxRetries})`);
+                            updateProgress(Math.min((i / maxRetries) * 100, 90), 'Service initializing...');
+                        }
+                    } else if (resp.status === 500) {
+                        // Server error
+                        try {
+                            const errorData = await resp.json();
+                            const message = errorData.detail?.message || 'Server error occurred';
+                            console.error(`[TTS] Error: ${message}`);
+                            updateProgress(0, `Error: ${message}`);
+                            setStatus('offline');
+                        } catch (e) {
+                            console.error(`[TTS] Server error (500)`);
+                        }
+                    }
+                } catch (e) {
+                    // Service not ready yet, will retry
+                    // CORS errors are expected during startup and can be safely ignored
+                    console.debug(`[TTS] Service not responding, retrying... (${i + 1}/${maxRetries})`);
+                    updateProgress(Math.min((i / maxRetries) * 50, 45), 'Waiting for service to start...');
+                }
+
+                if (i < maxRetries - 1) {
+                    await new Promise(resolve => setTimeout(resolve, retryDelay));
+                }
+            }
+
+            // After all retries, service is still offline - keep red
+            updateProgress(0, 'Service unavailable - please check logs');
+            setStatus('offline');
+            return false;
+        }
+
+        async function convertWavToMp3(wavBlob) {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const arrayBuffer = await wavBlob.arrayBuffer();
+            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+            const channels = audioBuffer.numberOfChannels;
+            const sampleRate = audioBuffer.sampleRate;
+            const samples = audioBuffer.getChannelData(0); // Get left channel
+
+            // Convert float samples to 16-bit PCM
+            const pcmData = new Int16Array(samples.length);
+            for (let i = 0; i < samples.length; i++) {
+                const s = Math.max(-1, Math.min(1, samples[i]));
+                pcmData[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+            }
+
+            // Encode to MP3 using lamejs
+            const mp3encoder = new lamejs.Mp3Encoder(1, sampleRate, 128);
+            const mp3Data = [];
+            const sampleBlockSize = 1152;
+
+            for (let i = 0; i < pcmData.length; i += sampleBlockSize) {
+                const sampleChunk = pcmData.subarray(i, i + sampleBlockSize);
+                const mp3buf = mp3encoder.encodeBuffer(sampleChunk);
+                if (mp3buf.length > 0) {
+                    mp3Data.push(mp3buf);
+                }
+            }
+
+            const mp3buf = mp3encoder.flush();
+            if (mp3buf.length > 0) {
+                mp3Data.push(mp3buf);
+            }
+
+            return new Blob(mp3Data, { type: 'audio/mp3' });
+        }
+
+        async function tts() {
+            const t = translations[currentLang] || translations['en'];
+            const text = document.getElementById('text').value;
+            const language = document.getElementById('interfaceLanguage').value;
+            const speaker = document.getElementById('speaker').value;
+            const result = document.getElementById('ttsResult');
+
+            result.innerHTML = '';
+            setStatus(true);
+            updateProgress(30, t.genProgress);
+
+            try {
+                const resp = await fetch(getTTSUrl(), {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        text: text,
+                        language: language,
+                        speaker: speaker
+                    })
+                });
+
+                updateProgress(70, t.genProgress);
+
+                if (!resp.ok) {
+                    result.innerHTML = "Error: " + await resp.text();
+                    updateProgress(0);
+                    setStatus(false);
+                    return;
+                }
+
+                const blob = await resp.blob();
+                const url = URL.createObjectURL(blob);
+
+                updateProgress(100, t.genProgress);
+
+                // Convert to MP3
+                const mp3Blob = await convertWavToMp3(blob);
+                const mp3Url = URL.createObjectURL(mp3Blob);
+
+                setTimeout(() => updateProgress(0), 2000);
+
+                result.innerHTML = `
+      <audio controls src="${url}" style="width: 100%; margin-bottom: 1rem;"></audio>
+      <div style="display: flex; gap: 1rem;">
+        <a href="${url}" download="voice_${language}_${speaker}.wav" style="color: #58a6ff; text-decoration: none; flex: 1; text-align: center; padding: 0.5rem; background: #21262d; border-radius: 6px;">
+          ${t.downloadWav}
+        </a>
+        <a href="${mp3Url}" download="voice_${language}_${speaker}.mp3" style="color: #58a6ff; text-decoration: none; flex: 1; text-align: center; padding: 0.5rem; background: #21262d; border-radius: 6px;">
+          ${t.downloadMp3}
+        </a>
+      </div>
+    `;
+                setStatus(false);
+            } catch (e) {
+                console.error('TTS Error:', e);
+                result.innerHTML = t.connError;
+                updateProgress(0);
+                setStatus(false);
+            }
+        }
+
+        // Check service health on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            checkServiceHealth();
+        });
+    </script>
+</body>
+
+</html>

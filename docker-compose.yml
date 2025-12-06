@@ -1,0 +1,28 @@
+services:
+  tts:
+    build: ./tts-service
+    container_name: ai-voice-tts
+    ports:
+      - "${TTS_PORT:-9876}:5002"
+    volumes:
+      - ./models:/root/.local/share/tts
+    environment:
+      - COQUI_TOS_AGREED=1
+      - DEFAULT_LANGUAGE=${DEFAULT_LANGUAGE:-en}
+      - DEFAULT_SPEAKER=${DEFAULT_SPEAKER:-male}
+      - CORS_ALLOW_ORIGINS=${CORS_ALLOW_ORIGINS:-*}
+      - CORS_ALLOW_CREDENTIALS=${CORS_ALLOW_CREDENTIALS:-false}
+      - CORS_ALLOW_METHODS=${CORS_ALLOW_METHODS:-*}
+      - CORS_ALLOW_HEADERS=${CORS_ALLOW_HEADERS:-*}
+    restart: unless-stopped
+
+  web:
+    image: python:3.11-slim
+    container_name: ai-voice-tts-web
+    ports:
+      - "${WEB_PORT:-8080}:8080"
+    volumes:
+      - ./web:/app
+    working_dir: /app
+    command: python -m http.server 8080
+    restart: unless-stopped
