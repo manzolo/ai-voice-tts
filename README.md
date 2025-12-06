@@ -4,6 +4,8 @@
 
 Local GPU-accelerated Text-to-Speech service with web interface. Runs completely offline using Docker containers.
 
+<img width="1005" height="687" alt="immagine" src="https://github.com/user-attachments/assets/79e7c056-dfc7-4920-a107-71659353cfd2" />
+
 <a href="https://www.buymeacoffee.com/manzolo">
   <img src=".github/blue-button.png" alt="Buy Me A Coffee" width="200">
 </a>
