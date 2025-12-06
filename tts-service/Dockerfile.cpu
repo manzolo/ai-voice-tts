@@ -1,0 +1,33 @@
+# CPU-optimized Dockerfile
+FROM python:3.10-slim-bullseye
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    git \
+    libsndfile1 \
+    ffmpeg \
+    espeak-ng \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# OPTIMIZATION: Install PyTorch CPU *first* to prevent pip from downloading 
+# the huge NVIDIA-enabled PyTorch wheels when installing 'TTS'.
+# We pin the version to match what is likely expected or compatible.
+RUN pip3 install --no-cache-dir torch==2.1.2 torchaudio==2.1.2 --index-url https://download.pytorch.org/whl/cpu
+
+# Copy requirements file
+COPY requirements-cpu.txt ./
+
+# Install other dependencies
+# (Since torch is already installed, this step won't try to reinstall the GPU version)
+RUN pip3 install --no-cache-dir -r requirements-cpu.txt
+
+# Copy application code
+COPY app.py .
+
+EXPOSE 5002
+
+CMD ["python3", "app.py"]

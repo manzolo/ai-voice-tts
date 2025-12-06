@@ -2,8 +2,7 @@ services:
   tts:
     build:
       context: ./tts-service
-      args:
-        REQUIREMENTS_FILE: requirements-cpu.txt
+      dockerfile: Dockerfile.cpu
     container_name: ai-voice-tts
     ports:
       - "${TTS_PORT:-9876}:5002"
