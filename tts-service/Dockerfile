@@ -21,7 +21,11 @@ WORKDIR /app
 
 # Copy requirements and install (leverage layer caching)
 COPY requirements*.txt ./
-RUN pip3 install --no-cache-dir -r ${REQUIREMENTS_FILE}
+RUN if [ "${REQUIREMENTS_FILE}" = "requirements-cpu.txt" ]; then \
+        echo "Installing PyTorch CPU version..."; \
+        pip3 install --no-cache-dir torch==2.1.2 torchaudio==2.1.2 --index-url https://download.pytorch.org/whl/cpu; \
+    fi && \
+    pip3 install --no-cache-dir -r ${REQUIREMENTS_FILE}
 
 # Copy application (separate layer for better caching)
 COPY app.py .

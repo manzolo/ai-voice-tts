@@ -1,9 +1,5 @@
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
---index-url https://download.pytorch.org/whl/cpu
-torch==2.1.2+cpu
-torchaudio==2.1.2+cpu
---index-url https://pypi.org/simple
 transformers==4.33.3
 TTS==0.22.0
 soundfile==0.12.1
