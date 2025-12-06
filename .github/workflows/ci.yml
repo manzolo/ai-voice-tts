@@ -98,7 +98,7 @@ jobs:
 
             # Check if output file exists and is not empty
             if [ -f /tmp/test_output.wav ] && [ -s /tmp/test_output.wav ]; then
-              file_size=$(stat -f%z /tmp/test_output.wav 2>/dev/null || stat -c%s /tmp/test_output.wav)
+              file_size=$(stat -c%s /tmp/test_output.wav)
               echo "✅ Audio file generated (size: $file_size bytes)"
 
               # Verify it's a valid WAV file

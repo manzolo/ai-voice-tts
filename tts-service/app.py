@@ -46,8 +46,13 @@ print(f"  - Headers: {CORS_HEADERS}")
 DEFAULT_LANGUAGE = os.getenv("DEFAULT_LANGUAGE", "it")
 DEFAULT_SPEAKER = os.getenv("DEFAULT_SPEAKER", "male")
 
+# Model configuration - allows using smaller models for CI/testing
+TTS_MODEL = os.getenv("TTS_MODEL", "tts_models/multilingual/multi-dataset/xtts_v2")
+TTS_VOCODER = os.getenv("TTS_VOCODER", None)  # Optional vocoder for non-end-to-end models
+
 # Global state tracking
 tts = None
+model_name = TTS_MODEL.split('/')[-1] if TTS_MODEL else "unknown"
 loading_state = {
     "status": "initializing",  # initializing, downloading, loading, ready, error
     "message": "Service starting up...",
@@ -74,18 +79,26 @@ def initialize_models():
 
         loading_state["progress"] = 20
 
-        # Initialize XTTS v2 model (multilingual with voice cloning)
+        # Initialize TTS model (configurable via environment)
         loading_state["status"] = "downloading"
-        loading_state["message"] = "Downloading/loading XTTS v2 model (~2GB, may take several minutes on first run)..."
+        is_xtts = "xtts" in TTS_MODEL.lower()
+        model_size = "~2GB" if is_xtts else "~100-500MB"
+        loading_state["message"] = f"Downloading/loading {model_name} model ({model_size}, may take several minutes on first run)..."
         loading_state["progress"] = 30
-        print("Loading XTTS v2 model...")
+        print(f"Loading TTS model: {TTS_MODEL}")
+        if TTS_VOCODER:
+            print(f"Using vocoder: {TTS_VOCODER}")
 
-        tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2", gpu=torch.cuda.is_available())
+        # Initialize TTS with or without vocoder
+        if TTS_VOCODER:
+            tts = TTS(TTS_MODEL, vocoder_path=TTS_VOCODER, gpu=torch.cuda.is_available())
+        else:
+            tts = TTS(TTS_MODEL, gpu=torch.cuda.is_available())
 
         loading_state["status"] = "ready"
         loading_state["message"] = "TTS service ready"
         loading_state["progress"] = 100
-        print("XTTS v2 model loaded!")
+        print(f"TTS model loaded: {model_name}")
 
     except Exception as e:
         loading_state["status"] = "error"
@@ -140,6 +153,9 @@ LANGUAGE_SPEAKER_MAP = {
 }
 
 print(f"Configuration:")
+print(f"  - TTS Model: {TTS_MODEL}")
+if TTS_VOCODER:
+    print(f"  - Vocoder: {TTS_VOCODER}")
 print(f"  - GPU available: {torch.cuda.is_available()}")
 print(f"  - Default language: {DEFAULT_LANGUAGE}, Default speaker: {DEFAULT_SPEAKER}")
 print(f"  - Available speakers: {list(SPEAKER_MAP.keys())}")
@@ -355,14 +371,24 @@ async def text_to_speech(request: TTSRequest):
 
 @app.get("/")
 async def root():
-    return {
+    # Determine supported languages based on model
+    is_xtts = "xtts" in TTS_MODEL.lower()
+    supported_langs = ["it", "en", "es", "fr", "de", "pt", "pl", "tr", "ru", "nl", "cs", "ar", "zh-cn", "ja", "hu", "ko"] if is_xtts else ["en"]
+
+    response = {
         "status": "running",
-        "model": "xtts_v2",
+        "model": model_name,
+        "model_path": TTS_MODEL,
         "gpu": torch.cuda.is_available(),
-        "supported_languages": ["it", "en", "es", "fr", "de", "pt", "pl", "tr", "ru", "nl", "cs", "ar", "zh-cn", "ja", "hu", "ko"],
+        "supported_languages": supported_langs,
         "speakers": list(SPEAKER_MAP.keys()),
         "speaker_map": SPEAKER_MAP
     }
+
+    if TTS_VOCODER:
+        response["vocoder"] = TTS_VOCODER
+
+    return response
 
 @app.get("/health")
 async def health():
@@ -372,7 +398,8 @@ async def health():
         if loading_state["status"] == "ready":
             return {
                 "status": "healthy",
-                "model": "xtts_v2",
+                "model": model_name,
+                "model_path": TTS_MODEL,
                 "model_loaded": True,
                 "gpu_available": torch.cuda.is_available(),
                 "loading_state": loading_state["status"],

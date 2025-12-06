@@ -1,5 +1,7 @@
 # AI Voice TTS - Text-to-Speech Service
 
+![CI Status](https://github.com/manzolo/ai-voice-tts/actions/workflows/ci.yml/badge.svg)
+
 Local GPU-accelerated Text-to-Speech service with web interface. Runs completely offline using Docker containers.
 
 <a href="https://www.buymeacoffee.com/manzolo">
@@ -96,12 +98,55 @@ Edit `.env` to change settings:
 DEFAULT_LANGUAGE=en
 DEFAULT_SPEAKER=male
 
+# TTS Model Configuration
+# Default: XTTS v2 (~2GB, multilingual)
+TTS_MODEL=tts_models/multilingual/multi-dataset/xtts_v2
+
+# For faster CI/testing with smaller models (~100-200MB, English only):
+# TTS_MODEL=tts_models/en/ljspeech/glow-tts
+# TTS_MODEL=tts_models/en/ljspeech/tacotron2-DDC
+
+# Optional vocoder (only for non-end-to-end models)
+TTS_VOCODER=
+
 # Ports
 TTS_PORT=9876
 WEB_PORT=8080
 
 # GPU (for GPU mode only)
 CUDA_VISIBLE_DEVICES=0
+```
+
+### Using Smaller Models
+
+For development, CI, or resource-constrained environments, you can use smaller models:
+
+**glow-tts** (~100MB, fast, English only):
+```bash
+TTS_MODEL=tts_models/en/ljspeech/glow-tts
+```
+
+**tacotron2-DDC** (~200MB, high quality, English only):
+```bash
+TTS_MODEL=tts_models/en/ljspeech/tacotron2-DDC
+TTS_VOCODER=vocoder_models/en/ljspeech/hifigan_v2
+```
+
+## CI/CD and Testing
+
+The project includes automated testing via GitHub Actions that:
+
+1. **Builds Docker images** without errors
+2. **Starts the service** with a small model (glow-tts ~100MB)
+3. **Verifies health endpoint** returns healthy status
+4. **Tests TTS API** by generating a test audio file
+5. **Validates output** ensures generated WAV file is valid
+
+The CI workflow uses a smaller model to stay within GitHub Actions resource limits while still testing the full functionality. See `.github/workflows/ci.yml` for details.
+
+**Running tests locally:**
+```bash
+make test  # Test the API with current configuration
 ```
 
 ## Architecture
