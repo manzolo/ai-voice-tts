@@ -245,3 +245,13 @@ This project uses Coqui TTS, which requires agreeing to their Terms of Service. 
 
 - [Coqui TTS](https://github.com/coqui-ai/TTS)
 - [XTTS v2 Model](https://huggingface.co/coqui/XTTS-v2)
+
+---
+
+## 🧠 Local AI Lab
+
+This project is part of **[manzolo's Local AI Lab](https://github.com/manzolo/local-ai-lab)** — a family of self-hosted AI projects (LLM, voice, vision & documents) that share the same conventions and can be wired together through the shared `local-ai-net` Docker network.
+
+This repo ships a `docker-compose.local-ai.yml` override to join the shared network — see the [conventions](https://github.com/manzolo/local-ai-lab#conventions).
+
+Explore the whole family: [`topic:local-ai`](https://github.com/search?q=user%3Amanzolo+topic%3Alocal-ai&type=repositories)
